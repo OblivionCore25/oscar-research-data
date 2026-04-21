@@ -28,14 +28,14 @@
 \title{Cross-Level Risk Propagation: Bridging Method-Level\\Architecture with Ecosystem-Level Dependency Analysis}
 
 \author{
-    \IEEEauthorblockN{Fabian Gonzalez}
+    \IEEEauthorblockN{R. Fabian Gonzalez-Arellano}
     \IEEEauthorblockA{
-        \textit{Department of Computer Science}\\
+        \textit{Master of Computer Information Systems}\\
         \textit{University}\\
         email@university.edu
     }
     \and
-    \IEEEauthorblockN{Collaborator Name}
+    \IEEEauthorblockN{Rakesh Podder}
     \IEEEauthorblockA{
         \textit{Department of Computer Science}\\
         \textit{University}\\
@@ -529,6 +529,10 @@ Cross-level and method-only scoring achieve comparable precision (P@5$=$0.44 for
 
 We note that this metric evaluates \emph{package-level association}---whether a top-ranked method belongs to a dependency with a known CVE---rather than method-level precision, since function-level CVE ground truth is rarely available (see RQ2). Consequently, the method-only baseline is competitive within a single dependency's scope, where composite risk alone determines ranking. However, cross-level scoring provides a capability that \emph{neither baseline alone achieves}: a unified ranking across dependencies with different ecosystem importance. Method-only scoring cannot compare a low-risk method in a high-fan-in package against a high-risk method in a low-fan-in package; the cross-level formula resolves this by weighting method risk by ecosystem exposure.
 
+\subsubsection{Statistical Analysis}
+
+To assess significance, we applied the Wilcoxon signed-rank test (two-sided) to the paired per-root-package P@$K$ values. The difference between cross-level and method-only scoring is \emph{not} statistically significant at $p < 0.05$ for any $K$, confirming that these strategies produce comparable rankings within our corpus. The difference between cross-level and ecosystem-only scoring is consistently positive but also does not reach significance ($p = 0.17$ at $K{=}5$), reflecting the small sample size ($n{=}10$ root packages). Bootstrap 95\% confidence intervals (10,000 iterations) show wide, overlapping ranges: cross-level P@5 $\in [0.22, 0.66]$, method-only $\in [0.24, 0.64]$, ecosystem-only $\in [0.00, 0.50]$. A larger corpus would be needed to establish statistical significance; however, the consistent 2$\times$ improvement over ecosystem-only across all $K$ values suggests a meaningful practical effect.
+
 \subsubsection{Case Study: The Express Supply Chain}
 
 To illustrate this, consider \texttt{express@5.1.0}, which depends on 45 transitive packages. The cross-level analysis selects the top-10 structural bottlenecks and identifies the following highest-risk methods:
@@ -596,6 +600,8 @@ The fact that all 15 matched functions are reachable is significant: it confirms
 \subsubsection{Analysis of Unmatched Functions}
 
 Of the 133 mined functions, 118 (89\%) were not found in the top-20 hotspots. This does not mean they are absent from the call graph---the Method Observatory stores the full graph, but our export pipeline captures only the 20 highest-risk methods per package. A full reachability analysis against the complete call graph (not just the hotspot subset) would determine the reachability status of these additional functions and is a priority for future work.
+
+To quantify this gap, we computed function-level Precision@$K$ using the 133 mined functions as ground truth. Across the 7 root packages with function-level data, function-level P@5 is only 0.029 for both cross-level and method-only---confirming that CVE-affected functions do not cluster among the highest-risk methods in their packages. This result underscores that risk ranking and vulnerability identification are complementary, not interchangeable, tasks: the cross-level formula identifies structurally critical code, while reachability analysis (against the full call graph, not just top-$K$ hotspots) is the appropriate mechanism for CVE-specific filtering.
 
 Three packages exhibited naming mismatches that reduced matching: \texttt{lodash}'s minified build uses obfuscated names (\texttt{Vo}, \texttt{Xc}, \texttt{Ye}) that do not correspond to the source-level names in our AST-based call graph. This highlights a known limitation of analyzing bundled or minified packages (§\ref{subsec:threats}).
 
@@ -694,7 +700,7 @@ Our analysis also identifies a class of \emph{hidden amplifiers}---micro-depende
 
 Future work includes extending reachability analysis across package boundaries through incremental call-graph composition, supporting additional ecosystems (Go, Rust, Java), and conducting longitudinal studies of how cross-level risk evolves as packages are updated.
 
-\smallskip\noindent\textbf{Data Availability.} The study corpus definition, analysis scripts, exported datasets, and the automated patch mining pipeline are available at \url{https://github.com/OblivionCore25}.
+\smallskip\noindent\textbf{Data Availability.} The study corpus definition, analysis scripts, exported datasets, and the automated patch mining pipeline are available at \url{https://github.com/OblivionCore25/oscar-research-data}.
 
 % ══════════════════════════════════════════════════════════════
 % ACKNOWLEDGMENTS

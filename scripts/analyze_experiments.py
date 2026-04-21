@@ -333,6 +333,295 @@ for K in K_VALUES:
 
 
 # ══════════════════════════════════════════════════════════════
+# RQ1b: FUNCTION-LEVEL GROUND TRUTH (Fix 1)
+# Uses mined CVE functions as precise ground truth instead of
+# package-level CVE association.
+# ══════════════════════════════════════════════════════════════
+
+print("\n" + "=" * 70)
+print("RQ1b: FUNCTION-LEVEL PRECISION (using mined CVE functions)")
+print("=" * 70)
+
+# Load CVE patch mining data to build function-level ground truth
+CVE_PATCH_FILE = DATA_DIR / "cve_patch_analysis.csv"
+if CVE_PATCH_FILE.exists():
+    cve_patches = load_csv(CVE_PATCH_FILE)
+
+    # Build set of (package, function_name) pairs from mined CVE data
+    cve_functions = {}  # package -> set of function names
+    for r in cve_patches:
+        if r.get('functions_mined'):
+            pkg = r['affected_package']
+            if pkg not in cve_functions:
+                cve_functions[pkg] = set()
+            for fn in r['functions_mined'].split(';'):
+                fn = fn.strip()
+                if fn:
+                    cve_functions[pkg].add(fn)
+
+    total_cve_funcs = sum(len(fns) for fns in cve_functions.values())
+    print(f"\n  CVE function ground truth: {total_cve_funcs} functions across {len(cve_functions)} packages")
+    for pkg, fns in sorted(cve_functions.items()):
+        print(f"    {pkg}: {len(fns)} functions")
+
+    # Function-level Precision@K: "Of the top-K methods, how many are
+    # actual CVE-affected functions (exact function name match)?"
+    rq1b_results = []
+
+    for root_pkg in cl_by_root:
+        methods = cl_by_root[root_pkg]
+        if not methods:
+            continue
+
+        # Check if any dependency in this root's analysis has CVE functions
+        dep_pkgs = set(m['dependency_package'] for m in methods)
+        relevant_cve_pkgs = dep_pkgs & set(cve_functions.keys())
+        if not relevant_cve_pkgs:
+            continue
+
+        # Build the ground truth set for this root's supply chain
+        gt_funcs = set()
+        for pkg in relevant_cve_pkgs:
+            for fn in cve_functions[pkg]:
+                gt_funcs.add((pkg, fn))
+
+        # Sort by each strategy
+        cl_sorted = sorted(methods, key=lambda m: safe_float(m['cross_level_risk']), reverse=True)
+        method_sorted = sorted(methods, key=lambda m: safe_float(m['method_composite_risk']), reverse=True)
+        eco_sorted = sorted(methods, key=lambda m: safe_float(m['ecosystem_fan_in']), reverse=True)
+
+        def func_precision_at_k(sorted_methods, k, ground_truth):
+            """Precision@K using exact function-level match."""
+            top_k = sorted_methods[:k]
+            hits = sum(1 for m in top_k
+                       if (m['dependency_package'], m['method_name']) in ground_truth)
+            return hits / k if k > 0 else 0
+
+        for K in K_VALUES:
+            p_cl = func_precision_at_k(cl_sorted, K, gt_funcs)
+            p_method = func_precision_at_k(method_sorted, K, gt_funcs)
+            p_eco = func_precision_at_k(eco_sorted, K, gt_funcs)
+
+            rq1b_results.append({
+                'root_package': root_pkg,
+                'K': K,
+                'func_precision_cross_level': round(p_cl, 4),
+                'func_precision_method_only': round(p_method, 4),
+                'func_precision_ecosystem_only': round(p_eco, 4),
+                'n_cve_functions': len(gt_funcs),
+                'n_total_methods': len(methods),
+            })
+
+    # Aggregate function-level results
+    rq1b_roots = set(r['root_package'] for r in rq1b_results)
+    print(f"\n  Root packages with function-level ground truth: {len(rq1b_roots)}")
+
+    print(f"\n  {'K':>3}  {'FuncP@K (Cross-Level)':>22}  {'FuncP@K (Method-Only)':>22}  {'FuncP@K (Eco-Only)':>22}")
+    print("  " + "-" * 75)
+
+    rq1b_summary = {}
+    for K in K_VALUES:
+        k_results = [r for r in rq1b_results if r['K'] == K]
+        if not k_results:
+            continue
+
+        avg_cl = avg([r['func_precision_cross_level'] for r in k_results])
+        avg_method = avg([r['func_precision_method_only'] for r in k_results])
+        avg_eco = avg([r['func_precision_ecosystem_only'] for r in k_results])
+
+        rq1b_summary[K] = {
+            'avg_func_p_cross_level': round(avg_cl, 4),
+            'avg_func_p_method_only': round(avg_method, 4),
+            'avg_func_p_eco_only': round(avg_eco, 4),
+        }
+
+        print(f"  {K:>3}  {avg_cl:>22.4f}  {avg_method:>22.4f}  {avg_eco:>22.4f}")
+
+    # Save function-level results
+    if rq1b_results:
+        rq1b_path = OUTPUT_DIR / "rq1b_function_level_results.csv"
+        with open(rq1b_path, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=rq1b_results[0].keys())
+            writer.writeheader()
+            writer.writerows(rq1b_results)
+        print(f"\n  → {rq1b_path.name} ({len(rq1b_results)} rows)")
+else:
+    print("  WARNING: cve_patch_analysis.csv not found — skipping function-level analysis")
+    rq1b_results = []
+    rq1b_summary = {}
+
+
+# ══════════════════════════════════════════════════════════════
+# RQ1c: STATISTICAL SIGNIFICANCE TESTS (Fix 2)
+# Wilcoxon signed-rank + bootstrap confidence intervals
+# ══════════════════════════════════════════════════════════════
+
+print("\n" + "=" * 70)
+print("RQ1c: STATISTICAL SIGNIFICANCE TESTS")
+print("=" * 70)
+
+import random
+
+def wilcoxon_signed_rank(x, y):
+    """
+    Wilcoxon signed-rank test (two-sided) for paired samples.
+    Returns (W statistic, approximate p-value using normal approximation).
+    Appropriate for small paired samples (n >= 6).
+    """
+    diffs = [xi - yi for xi, yi in zip(x, y)]
+    # Remove zero differences
+    diffs = [(abs(d), 1 if d > 0 else -1) for d in diffs if d != 0]
+    if len(diffs) < 6:
+        return None, None  # Too few non-zero differences
+
+    n = len(diffs)
+    # Rank by absolute value
+    sorted_diffs = sorted(enumerate(diffs), key=lambda x: x[1][0])
+    ranks = [0] * n
+    i = 0
+    while i < n:
+        j = i
+        while j < n and sorted_diffs[j][1][0] == sorted_diffs[i][1][0]:
+            j += 1
+        avg_rank = sum(range(i + 1, j + 1)) / (j - i)
+        for k in range(i, j):
+            ranks[sorted_diffs[k][0]] = avg_rank
+        i = j
+
+    # W+ = sum of ranks for positive differences
+    w_plus = sum(ranks[i] for i in range(n) if diffs[i][1] > 0)
+    w_minus = sum(ranks[i] for i in range(n) if diffs[i][1] < 0)
+    W = min(w_plus, w_minus)
+
+    # Normal approximation for p-value
+    mean_W = n * (n + 1) / 4
+    std_W = math.sqrt(n * (n + 1) * (2 * n + 1) / 24)
+    if std_W == 0:
+        return W, 1.0
+    z = (W - mean_W) / std_W
+    # Two-tailed p-value using normal CDF approximation
+    p_value = 2 * (1 - _norm_cdf(abs(z)))
+    return W, p_value
+
+def _norm_cdf(z):
+    """Approximation of standard normal CDF (Abramowitz & Stegun)."""
+    if z < 0:
+        return 1 - _norm_cdf(-z)
+    a1, a2, a3, a4, a5 = 0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429
+    p = 0.3275911
+    t = 1.0 / (1.0 + p * z)
+    y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * math.exp(-z * z / 2.0)
+    return y
+
+def bootstrap_ci(values, n_bootstrap=10000, ci=0.95, seed=42):
+    """Bootstrap confidence interval for the mean."""
+    rng = random.Random(seed)
+    n = len(values)
+    if n == 0:
+        return 0, 0, 0
+    means = []
+    for _ in range(n_bootstrap):
+        sample = [rng.choice(values) for _ in range(n)]
+        means.append(sum(sample) / n)
+    means.sort()
+    alpha = (1 - ci) / 2
+    lo_idx = int(alpha * n_bootstrap)
+    hi_idx = int((1 - alpha) * n_bootstrap)
+    return sum(values) / n, means[lo_idx], means[hi_idx]
+
+# Run statistical tests on package-level P@K (original RQ1)
+print("\n  Package-Level P@K — Wilcoxon Signed-Rank Tests:")
+print(f"  {'Comparison':<35} {'K':>3}  {'W':>6}  {'p-value':>10}  {'Significant?':>14}")
+print("  " + "-" * 75)
+
+for K in K_VALUES:
+    k_results = [r for r in rq1_results if r['K'] == K]
+    if len(k_results) < 6:
+        print(f"  {'Cross-Level vs Method-Only':<35} {K:>3}  {'n/a':>6}  {'n<6':>10}  {'—':>14}")
+        continue
+
+    cl_vals = [r['precision_cross_level'] for r in k_results]
+    method_vals = [r['precision_method_only'] for r in k_results]
+    eco_vals = [r['precision_ecosystem_only'] for r in k_results]
+
+    # Cross-level vs method-only
+    W, p = wilcoxon_signed_rank(cl_vals, method_vals)
+    sig = "Yes (p<0.05)" if p is not None and p < 0.05 else "No"
+    W_s = f"{W:.1f}" if W is not None else "n/a"
+    p_s = f"{p:.4f}" if p is not None else "n/a"
+    print(f"  {'Cross-Level vs Method-Only':<35} {K:>3}  {W_s:>6}  {p_s:>10}  {sig:>14}")
+
+    # Cross-level vs eco-only
+    W2, p2 = wilcoxon_signed_rank(cl_vals, eco_vals)
+    sig2 = "Yes (p<0.05)" if p2 is not None and p2 < 0.05 else "No"
+    W2_s = f"{W2:.1f}" if W2 is not None else "n/a"
+    p2_s = f"{p2:.4f}" if p2 is not None else "n/a"
+    print(f"  {'Cross-Level vs Eco-Only':<35} {K:>3}  {W2_s:>6}  {p2_s:>10}  {sig2:>14}")
+
+# Bootstrap confidence intervals
+print(f"\n  Bootstrap 95% Confidence Intervals (10,000 iterations):")
+print(f"  {'Strategy':<20} {'K':>3}  {'Mean':>8}  {'95% CI':>20}")
+print("  " + "-" * 55)
+
+for K in K_VALUES:
+    k_results = [r for r in rq1_results if r['K'] == K]
+    if not k_results:
+        continue
+
+    for label, key in [("Cross-Level", "precision_cross_level"),
+                        ("Method-Only", "precision_method_only"),
+                        ("Eco-Only", "precision_ecosystem_only")]:
+        vals = [r[key] for r in k_results]
+        mean_val, lo, hi = bootstrap_ci(vals)
+        print(f"  {label:<20} {K:>3}  {mean_val:>8.4f}  [{lo:.4f}, {hi:.4f}]")
+    print()
+
+# Also run on function-level results if available
+if rq1b_results:
+    print(f"\n  Function-Level FuncP@K — Wilcoxon Signed-Rank Tests:")
+    print(f"  {'Comparison':<35} {'K':>3}  {'W':>6}  {'p-value':>10}  {'Significant?':>14}")
+    print("  " + "-" * 75)
+
+    for K in K_VALUES:
+        k_results = [r for r in rq1b_results if r['K'] == K]
+        if len(k_results) < 6:
+            print(f"  {'Cross-Level vs Method-Only':<35} {K:>3}  {'n/a':>6}  {'n<6':>10}  {'—':>14}")
+            continue
+
+        cl_vals = [r['func_precision_cross_level'] for r in k_results]
+        method_vals = [r['func_precision_method_only'] for r in k_results]
+        eco_vals = [r['func_precision_ecosystem_only'] for r in k_results]
+
+        W, p = wilcoxon_signed_rank(cl_vals, method_vals)
+        sig = "Yes (p<0.05)" if p is not None and p < 0.05 else "No"
+        p_str = f"{p:.4f}" if p is not None else "n/a"
+        W_str = f"{W:.1f}" if W is not None else "n/a"
+        print(f"  {'Cross-Level vs Method-Only':<35} {K:>3}  {W_str:>6}  {p_str:>10}  {sig:>14}")
+
+        W2, p2 = wilcoxon_signed_rank(cl_vals, eco_vals)
+        sig2 = "Yes (p<0.05)" if p2 is not None and p2 < 0.05 else "No"
+        p2_str = f"{p2:.4f}" if p2 is not None else "n/a"
+        W2_str = f"{W2:.1f}" if W2 is not None else "n/a"
+        print(f"  {'Cross-Level vs Eco-Only':<35} {K:>3}  {W2_str:>6}  {p2_str:>10}  {sig2:>14}")
+
+    print(f"\n  Function-Level Bootstrap 95% CIs:")
+    print(f"  {'Strategy':<20} {'K':>3}  {'Mean':>8}  {'95% CI':>20}")
+    print("  " + "-" * 55)
+
+    for K in K_VALUES:
+        k_results = [r for r in rq1b_results if r['K'] == K]
+        if not k_results:
+            continue
+        for label, key in [("Cross-Level", "func_precision_cross_level"),
+                            ("Method-Only", "func_precision_method_only"),
+                            ("Eco-Only", "func_precision_ecosystem_only")]:
+            vals = [r[key] for r in k_results]
+            mean_val, lo, hi = bootstrap_ci(vals)
+            print(f"  {label:<20} {K:>3}  {mean_val:>8.4f}  [{lo:.4f}, {hi:.4f}]")
+        print()
+
+
+# ══════════════════════════════════════════════════════════════
 # RQ2: REACHABILITY FILTERING
 # ══════════════════════════════════════════════════════════════
 
