@@ -1,0 +1,45 @@
+======================================================================
+OSCAR EXPERIMENT SUMMARY — FOR §5 EVALUATION
+Generated: 2026-04-19T19:48:53.591797
+======================================================================
+
+TABLE 1: CORPUS SUMMARY
+----------------------------------------
+Metric                  npm     PyPI
+Packages                 35      15
+Avg methods/package        317     511
+Avg resolution rate     80.3%  81.6%
+Avg LOC                   2907    8519
+Unique CVEs              23      33
+
+RQ1: PRECISION@K
+----------------------------------------
+P@3: Cross-Level=0.4333  Method-Only=0.5000  Eco-Only=0.2000  Improvement=-13.3%
+P@5: Cross-Level=0.4400  Method-Only=0.4400  Eco-Only=0.2000  Improvement=+0.0%
+P@10: Cross-Level=0.3800  Method-Only=0.4200  Eco-Only=0.2300  Improvement=-9.5%
+
+nDCG:
+nDCG@3: Cross-Level=0.4235  Method-Only=0.5173  Eco-Only=0.2000
+nDCG@5: Cross-Level=0.4316  Method-Only=0.4702  Eco-Only=0.2000
+nDCG@10: Cross-Level=0.4053  Method-Only=0.4568  Eco-Only=0.2273
+
+RQ2: VULNERABILITY ANALYSIS
+----------------------------------------
+Total CVE records: 73
+Unique CVEs: 56
+Severity: CRITICAL=2, HIGH=24, MODERATE=30, LOW=10
+CVEs with affected_functions: 0/73 (0.0%)
+Vuln packages with call graphs: 13/19
+Vuln packages with R≥0.85: 8/19
+
+RQ3: FORMULA SENSITIVITY
+----------------------------------------
+Spearman correlations vs log10:
+  log10 vs log2:   ρ=1.0
+  log10 vs sqrt:   ρ=0.9921
+  log10 vs linear: ρ=0.9713
+
+Top-3 Jaccard agreement (avg):
+  log10 vs log2:   1.0000
+  log10 vs sqrt:   0.8429
+  log10 vs linear: 0.8286
