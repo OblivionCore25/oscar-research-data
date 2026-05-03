@@ -10,7 +10,7 @@ This repository contains the study corpus, analysis scripts, exported datasets, 
 
 ```bibtex
 @inproceedings{gonzalez2027crosslevel,
-  author    = {Gonzalez, Fabian and {Collaborator}},
+  author    = {Author, Anonymous and {Collaborator}},
   title     = {Cross-Level Risk Propagation: Bridging Method-Level 
                Architecture with Ecosystem-Level Dependency Analysis},
   booktitle = {Proc. 49th IEEE/ACM International Conference on 
@@ -28,9 +28,9 @@ The OSCAR (Open Supply-Chain Assurance & Resilience) platform consists of three 
 
 | Repository | Description |
 |-----------|-------------|
-| [oscar-dependency-observatory](https://github.com/OblivionCore25/oscar-dependency-observatory) | Ecosystem-level dependency graph resolution, enrichment, and cross-level orchestration (Python/FastAPI) |
-| [oscar-method-observatory](https://github.com/OblivionCore25/oscar-method-observatory) | Method-level static call-graph construction, composite risk, and reachability analysis (Python/FastAPI) |
-| [oscar-frontend](https://github.com/OblivionCore25/oscar-frontend) | Interactive cross-level risk dashboard (TypeScript/React) |
+| [oscar-dependency-observatory](https://github.com/ANONYMIZED_AUTHOR/oscar-dependency-observatory) | Ecosystem-level dependency graph resolution, enrichment, and cross-level orchestration (Python/FastAPI) |
+| [oscar-method-observatory](https://github.com/ANONYMIZED_AUTHOR/oscar-method-observatory) | Method-level static call-graph construction, composite risk, and reachability analysis (Python/FastAPI) |
+| [oscar-frontend](https://github.com/ANONYMIZED_AUTHOR/oscar-frontend) | Interactive cross-level risk dashboard (TypeScript/React) |
 
 ---
 

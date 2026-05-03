@@ -2,7 +2,7 @@
 
 > This document provides the formal definition, academic justification, and empirical validation of the **Internal Resolution Rate** metric used by OSCAR's structural reachability engine. It is intended to serve as a reference for the research paper and as a defensibility brief for peer review.
 >
-> **Companion document**: [resolution-rate-empirical-analysis.md](file:///Users/fabiangonzalez/Documents/OSCAR/docs/resolution-rate-empirical-analysis.md) — contains the forensic call-site decomposition, scope policy decisions, resolution strategy projections, and confidence threshold justification.
+> **Companion document**: [resolution-rate-empirical-analysis.md](file:///path/to/OSCAR/docs/resolution-rate-empirical-analysis.md) — contains the forensic call-site decomposition, scope policy decisions, resolution strategy projections, and confidence threshold justification.
 
 ---
 

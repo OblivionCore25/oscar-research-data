@@ -5,7 +5,7 @@
 1. Go to [overleaf.com](https://www.overleaf.com) → **New Project** → **Upload Project**
 2. Zip the `paper/` folder:
    ```bash
-   cd /Users/fabiangonzalez/Documents/OSCAR/research
+   cd /path/to/OSCAR/research
    zip -r oscar-paper.zip paper/
    ```
 3. Upload `oscar-paper.zip` to Overleaf

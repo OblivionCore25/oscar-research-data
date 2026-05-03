@@ -60,7 +60,7 @@ The research pipeline operates across **three layers**:
 
 ## 2. Stage 1: Corpus Definition
 
-**File:** [`scripts/corpus.json`](file:///Users/fabiangonzalez/Documents/OSCAR/scripts/corpus.json)
+**File:** [`scripts/corpus.json`](file:///path/to/OSCAR/scripts/corpus.json)
 
 The study corpus is a JSON file listing 50 packages with their ecosystem, name, version, and category:
 
@@ -93,7 +93,7 @@ Versions are pinned to specific releases (not ranges) to ensure reproducibility.
 
 ## 3. Stage 2: Data Ingestion
 
-**Script:** [`scripts/ingest_corpus.py`](file:///Users/fabiangonzalez/Documents/OSCAR/scripts/ingest_corpus.py)
+**Script:** [`scripts/ingest_corpus.py`](file:///path/to/OSCAR/scripts/ingest_corpus.py)
 
 This script batch-loads all 50 packages into both OSCAR observatories. It performs **four actions per package**:
 
@@ -172,7 +172,7 @@ python scripts/ingest_corpus.py --skip-method
 
 ## 4. Stage 3: Data Export
 
-**Script:** [`research/scripts/export_research_data.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/export_research_data.py)
+**Script:** [`research/scripts/export_research_data.py`](file:///path/to/OSCAR/research/scripts/export_research_data.py)
 
 This script queries both observatories and marshals the responses into 5 structured CSV files. It is the **bridge between OSCAR's runtime API and static research data**.
 
@@ -239,7 +239,7 @@ python research/scripts/export_research_data.py --only cross_level
 
 ## 5. Stage 4: CVE Patch Mining
 
-**Script:** [`research/scripts/mine_cve_patches.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/mine_cve_patches.py)
+**Script:** [`research/scripts/mine_cve_patches.py`](file:///path/to/OSCAR/research/scripts/mine_cve_patches.py)
 
 This is the **novel technique** developed to address the OSV data gap. It operates **independently of OSCAR** for data acquisition, then **cross-references with OSCAR** for reachability analysis.
 
@@ -352,7 +352,7 @@ This could serve the broader SCA community as a **GHSA-to-functions enrichment s
 
 ## 6. Stage 5: Experiment Analysis
 
-**Script:** [`research/scripts/analyze_experiments.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/analyze_experiments.py)
+**Script:** [`research/scripts/analyze_experiments.py`](file:///path/to/OSCAR/research/scripts/analyze_experiments.py)
 
 This script operates **entirely offline** — it reads the exported CSVs and produces the statistical results for the paper. No OSCAR services are needed.
 
@@ -563,14 +563,14 @@ The exported CSVs are designed for reuse. Potential extensions:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| [`scripts/corpus.json`](file:///Users/fabiangonzalez/Documents/OSCAR/scripts/corpus.json) | Study corpus definition | — |
-| [`scripts/ingest_corpus.py`](file:///Users/fabiangonzalez/Documents/OSCAR/scripts/ingest_corpus.py) | Batch ingestion orchestrator | 323 |
-| [`research/scripts/export_research_data.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/export_research_data.py) | OSCAR → CSV data export | 500 |
-| [`research/scripts/mine_cve_patches.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/mine_cve_patches.py) | CVE patch mining pipeline | 519 |
-| [`research/scripts/analyze_experiments.py`](file:///Users/fabiangonzalez/Documents/OSCAR/research/scripts/analyze_experiments.py) | Statistical analysis (P@K, nDCG, Spearman) | ~400 |
-| [`research/data/corpus_summary_*.csv`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | 50 rows × 26 cols | — |
-| [`research/data/cross_level_results_*.csv`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | 825 rows × 24 cols | — |
-| [`research/data/vulnerability_results_*.csv`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | 73 rows × 17 cols | — |
-| [`research/data/method_hotspots_*.csv`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | 761 rows × 26 cols | — |
-| [`research/data/cve_patch_analysis.csv`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | 45 rows — CVE patch mining results | — |
-| [`research/data/experiment_summary.txt`](file:///Users/fabiangonzalez/Documents/OSCAR/research/data) | All numbers for §5 | — |
+| [`scripts/corpus.json`](file:///path/to/OSCAR/scripts/corpus.json) | Study corpus definition | — |
+| [`scripts/ingest_corpus.py`](file:///path/to/OSCAR/scripts/ingest_corpus.py) | Batch ingestion orchestrator | 323 |
+| [`research/scripts/export_research_data.py`](file:///path/to/OSCAR/research/scripts/export_research_data.py) | OSCAR → CSV data export | 500 |
+| [`research/scripts/mine_cve_patches.py`](file:///path/to/OSCAR/research/scripts/mine_cve_patches.py) | CVE patch mining pipeline | 519 |
+| [`research/scripts/analyze_experiments.py`](file:///path/to/OSCAR/research/scripts/analyze_experiments.py) | Statistical analysis (P@K, nDCG, Spearman) | ~400 |
+| [`research/data/corpus_summary_*.csv`](file:///path/to/OSCAR/research/data) | 50 rows × 26 cols | — |
+| [`research/data/cross_level_results_*.csv`](file:///path/to/OSCAR/research/data) | 825 rows × 24 cols | — |
+| [`research/data/vulnerability_results_*.csv`](file:///path/to/OSCAR/research/data) | 73 rows × 17 cols | — |
+| [`research/data/method_hotspots_*.csv`](file:///path/to/OSCAR/research/data) | 761 rows × 26 cols | — |
+| [`research/data/cve_patch_analysis.csv`](file:///path/to/OSCAR/research/data) | 45 rows — CVE patch mining results | — |
+| [`research/data/experiment_summary.txt`](file:///path/to/OSCAR/research/data) | All numbers for §5 | — |
