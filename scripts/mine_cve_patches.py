@@ -38,8 +38,19 @@ from datetime import datetime
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 METHOD_OBS_URL = "http://127.0.0.1:8001"
 
-VULN_FILE = sorted(DATA_DIR.glob("vulnerability_results_*.csv"), reverse=True)[0]
-HOTSPOTS_FILE = sorted(DATA_DIR.glob("method_hotspots_*.csv"), reverse=True)[0]
+# Deferred to main() so the module can be imported for utility functions
+VULN_FILE = None
+HOTSPOTS_FILE = None
+
+def _resolve_data_files():
+    """Resolve data files at runtime (called by main())."""
+    global VULN_FILE, HOTSPOTS_FILE
+    vuln_candidates = sorted(DATA_DIR.glob("vulnerability_results_*.csv"), reverse=True)
+    hotspot_candidates = sorted(DATA_DIR.glob("method_hotspots_*.csv"), reverse=True)
+    if vuln_candidates:
+        VULN_FILE = vuln_candidates[0]
+    if hotspot_candidates:
+        HOTSPOTS_FILE = hotspot_candidates[0]
 
 # Rate limiting for GitHub API (unauthenticated: 60 req/hour)
 GITHUB_DELAY = 2.0  # seconds between requests
@@ -120,12 +131,40 @@ JS_FUNC_PATTERNS = [
     re.compile(r'^\s*module\.exports\.(\w+)\s*='),        # module.exports.name =
 ]
 
+JAVA_FUNC_PATTERNS = [
+    # Standard method: [modifiers] [<generics>] ReturnType methodName(
+    re.compile(
+        r'^\s*(?:(?:public|private|protected)\s+)?'
+        r'(?:(?:static|final|synchronized|abstract|native)\s+)*'
+        r'(?:<.+?>\s+)?'                     # optional generic type params (greedy-ish)
+        r'(?:[\w.<>\[\],\s?]+\s+)'            # return type (void, List<String>, int[])
+        r'(\w+)\s*\('                         # method name (capture group)
+    ),
+    # Constructor: [modifier] ClassName(params) {
+    re.compile(
+        r'^\s*(?:(?:public|private|protected)\s+)?'
+        r'([A-Z]\w*)\s*\('                    # constructor name starts with uppercase
+        r'[^)]*\)\s*'
+        r'(?:throws\s+[\w,\s]+)?\s*\{?'       # optional throws clause
+    ),
+    # Lambda assigned to variable: Type name = (params) ->
+    re.compile(
+        r'^\s*(?:(?:public|private|protected)\s+)?'
+        r'(?:(?:static|final)\s+)?'
+        r'[\w.<>\[\]]+\s+(\w+)\s*=\s*'
+        r'(?:\([^)]*\)|\w+)\s*->'
+    ),
+]
+
 # Ignore common non-function names
 IGNORE_NAMES = {
     'if', 'else', 'for', 'while', 'return', 'switch', 'case', 'try',
     'catch', 'throw', 'new', 'delete', 'typeof', 'void', 'True', 'False',
     'None', 'import', 'from', 'class', 'self', 'super', 'constructor',
     'describe', 'it', 'test', 'expect', 'beforeEach', 'afterEach',
+    # Java keywords that might match patterns
+    'package', 'interface', 'enum', 'assert', 'extends', 'implements',
+    'instanceof', 'synchronized', 'transient', 'volatile',
 }
 
 # Ignore test files
@@ -135,6 +174,11 @@ TEST_PATH_PATTERNS = [
     re.compile(r'\.test\.(js|py|ts)$'),
     re.compile(r'_test\.py$'),
     re.compile(r'spec[s]?/'),
+    # Java test patterns
+    re.compile(r'src/test/'),
+    re.compile(r'Test\.java$'),
+    re.compile(r'Tests\.java$'),
+    re.compile(r'IT\.java$'),  # integration tests
 ]
 
 
@@ -150,7 +194,12 @@ def extract_functions_from_diff(diff_text, ecosystem):
     which often contain the enclosing function name.
     """
     functions = set()
-    patterns = PYTHON_FUNC_PATTERNS if ecosystem == 'pypi' else JS_FUNC_PATTERNS
+    if ecosystem == 'pypi':
+        patterns = PYTHON_FUNC_PATTERNS
+    elif ecosystem == 'maven':
+        patterns = JAVA_FUNC_PATTERNS
+    else:
+        patterns = JS_FUNC_PATTERNS
     
     current_file = None
     
@@ -326,6 +375,7 @@ def main():
     print("=" * 70)
     
     # Load data
+    _resolve_data_files()
     vulns = load_csv(VULN_FILE)
     hotspots = load_csv(HOTSPOTS_FILE)
     
